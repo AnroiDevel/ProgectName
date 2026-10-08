@@ -1,0 +1,35 @@
+name: Update MOEX minute candles
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'moex-grid/scripts/download_history.py'
+      - '.github/workflows/moex-grid-data.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '25 7 * * 1-5'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: moex-grid-data
+  cancel-in-progress: false
+
+jobs:
+  historical-candles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified real market candles
+        run: python3 moex-grid/scripts/download_history.py
+      - name: Commit archive to public repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add moex-grid/data/
+          if ! git diff --cached --quiet; then
+            git commit -m "Update actual MOEX M1 history"
+            git push origin HEAD:master
+          fi
