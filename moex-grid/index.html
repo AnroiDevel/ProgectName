@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MOEX Grid Lab — анализ вечных фьючерсов</title>
+<style>
+:root{color-scheme:dark;font:14px system-ui,Arial;background:#0d1117;color:#e6edf3}
+*{box-sizing:border-box}body{margin:0}main{max-width:1480px;padding:14px;margin:auto}
+h1{font-size:23px;margin:0 0 4px}h2{font-size:16px;margin:0 0 12px}
+p{margin:8px 0}.muted{color:#919ca9}.small{font-size:12px}.box{background:#161b22;border:1px solid #30363d;border-radius:11px;padding:14px;margin:12px 0}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}
+label{display:flex;flex-direction:column;gap:5px;color:#a9b4c2}
+input,select,button{border:1px solid #3b4453;border-radius:7px;padding:10px;background:#0d1117;color:#f0f4fb;font:inherit;min-width:0}
+button{cursor:pointer;background:#2667d7;border-color:#2667d7;font-weight:600}button:disabled{opacity:.5;cursor:not-allowed}
+button.secondary{background:#232c38;border-color:#455061}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px}
+.stat{background:#111824;border:1px solid #30363d;border-radius:9px;padding:10px}.stat b{font-size:20px;display:block;margin-top:3px}
+.good{color:#3fb950}.bad{color:#ff7777}.hidden{display:none!important}
+table{width:100%;border-collapse:collapse;white-space:nowrap;font-variant-numeric:tabular-nums}
+th,td{padding:9px 11px;text-align:right;border-bottom:1px solid #30363d}
+th:first-child,td:first-child{text-align:left}th{position:sticky;top:0;background:#202934;cursor:pointer}
+.scroll{max-height:57vh;overflow:auto;border:1px solid #30363d;border-radius:8px}
+canvas{width:100%;height:210px;display:block}.graphs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.graph{background:#111824;border:1px solid #30363d;border-radius:9px;padding:10px}.graph b{display:block;margin-bottom:8px}
+#message{min-height:34px}.hint{border-left:3px solid #519aff;padding-left:10px}
+@media(max-width:600px){main{padding:8px}.box{padding:10px}h1{font-size:20px}.graphs{grid-template-columns:1fr}canvas{height:175px}}
+</style></head><body><main>
+<header><h1>MOEX Grid Lab</h1><div class="muted">Сравнение шага сетки вечных фьючерсов · минутная история · комиссия · статистика по дням</div></header>
+<section class="box">
+ <h2>Инструмент и период</h2>
+ <div class="fields">
+  <label>Вечный фьючерс<select id="symbol"><option>IMOEXF</option><option>CNYRUBF</option><option>GAZPF</option><option>SLVRUBF</option><option>SBERF</option><option>GLDRUBF</option><option>USDRUBF</option><option>EURRUBF</option><option>RGBIF</option></select></label>
+  <label>С<input id="from" type="date"></label><label>По<input id="to" type="date"></label>
+  <label>Размер тика<input id="tick" type="number" min=".000001" step="any"></label>
+  <label>Стоимость 1 пункта, ₽<input id="pointValue" type="number" min=".00001" step="any"></label>
+  <label>Комиссия за сторону, ₽/контракт<input id="fee" type="number" min="0" step="any"></label>
+ </div>
+ <div class="row" style="margin-top:12px"><button id="load">Получить историю</button><button id="refresh" class="secondary">Проверить другие источники</button><span id="source" class="small muted">Проверка источника при открытии</span></div>
+ <div id="message" class="small muted" style="margin-top:9px" aria-live="polite">Ожидание данных...</div>
+ <p class="small muted hint">Данные: свечи M1; алгоритм использует пересечения уровней между последовательными минутными закрытиями. Это оценка исполнений, не тиковый журнал сделок. Внутриминутные развороты не выдумываются. Просадка и фандинг не считаются.</p>
+</section>
+<section class="box">
+ <h2>Перебор шага</h2>
+ <div class="fields">
+  <label>Шаг от<input id="sFrom" type="number" step="any"></label>
+  <label>Шаг до<input id="sTo" type="number" step="any"></label>
+  <label>Инкремент<input id="sInc" type="number" step="any"></label>
+  <label>Контрактов в заявке<input id="qty" type="number" step="1" value="1" min="1"></label>
+ </div>
+ <div class="row" style="margin-top:12px"><button id="analyze" disabled>Сравнить шаги</button><span class="small muted">Каждый вход закрывается строго через один выбранный шаг; один вход на уровень</span></div>
+</section>
+<section id="summary" class="box hidden"><h2>Результат</h2><div class="stats">
+ <div class="stat"><span class="muted small">Максимум циклов</span><b id="topCount">—</b></div>
+ <div class="stat"><span class="muted small">Максимум прибыли</span><b id="topProfit">—</b></div>
+ <div class="stat"><span class="muted small">Свечей / дней</span><b id="count">—</b></div>
+ <div class="stat"><span class="muted small">Источник</span><b id="origin" style="font-size:14px">—</b></div>
+ </div></section>
+<section id="charts" class="box hidden"><h2>Сравнение шагов</h2><div class="graphs">
+<div class="graph"><b>Закрытых циклов в день</b><canvas id="stepChart"></canvas></div>
+<div class="graph"><b>Чистая прибыль в день, ₽</b><canvas id="profitChart"></canvas></div>
+</div></section>
+<section id="daySection" class="box hidden"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Статистика по дням</h2><label>Шаг<select id="dayStep"></select></label></div>
+<div class="graph"><b>Завершённые циклы по дням</b><canvas id="dayChart"></canvas></div>
+<div class="scroll" style="max-height:35vh;margin-top:10px"><table><thead><tr><th>Дата</th><th>Циклы</th><th>Чистая прибыль, ₽</th></tr></thead><tbody id="dayRows"></tbody></table></div></section>
+<section id="comparison" class="box hidden"><h2>Таблица сравнения шагов</h2><div class="scroll"><table><thead><tr>
+<th data-k="step">Шаг</th><th data-k="cycles">Закрытых циклов</th><th data-k="avg">Циклов/день</th><th data-k="median">Медиана/день</th><th data-k="executions">Исполнений</th><th data-k="opened">Открытых входов</th><th data-k="gross">Валовая, ₽</th><th data-k="fees">Комиссия циклов, ₽</th><th data-k="net">Чистая, ₽</th>
+</tr></thead><tbody id="rows"></tbody></table></div></section>
+<footer class="muted small" style="margin:18px 4px">Источник истории в каждом расчёте указан явно. Комиссии из пресетов — редактируемые ориентиры, а не гарантия тарифа брокера. Версия 1.0.</footer>
+</main><script src="./app.js"></script></body></html>
